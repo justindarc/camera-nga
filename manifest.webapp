@@ -1,0 +1,74 @@
+{
+  "version": "0.0.1",
+  "name": "Camera NGA",
+  "description": "Gaia Camera NGA",
+  "launch_path": "/index.html",
+  "icons": {
+    "84": "/img/icons/camera_84.png",
+    "126": "/img/icons/camera_126.png",
+    "142": "/img/icons/camera_142.png",
+    "189": "/img/icons/camera_189.png",
+    "284": "/img/icons/camera_284.png"
+  },
+  "developer": {
+    "name": "The Gaia Team",
+    "url": "https://github.com/mozilla-b2g/gaia"
+  },
+  "type": "certified",
+  "permissions": {
+    "audio-channel-content": {},
+    "audio-channel-notification": {},
+    "camera": {},
+    "device-storage:pictures": { "access": "readwrite" },
+    "device-storage:videos":   { "access": "readwrite" },
+    "feature-detection": {},
+    "geolocation": {},
+    "settings": { "access": "readonly" },
+    "themeable": {},
+    "moz-extremely-unstable-and-will-change-webcomponents": {}
+  },
+  "activities": {
+    "record": {
+      "filters": {
+        "type": [
+          "photos",
+          "videos"
+        ]
+      },
+      "disposition": "window"
+    },
+    "pick": {
+      "filters": {
+        "type": [
+          "image/*",
+          "image/jpeg",
+          "video/*",
+          "video/3gpp"
+        ]
+      },
+      "disposition": "inline",
+      "href": "/pick.html",
+      "returnValue": true
+    }
+  },
+  "locales": {
+    "ar": {
+      "name": "الكاميرا NGA",
+      "description": " Gaiaالكاميرا NGA"
+    },
+    "en-US": {
+      "name": "Camera NGA",
+      "description": "Gaia Camera NGA"
+    },
+    "fr": {
+      "name": "Photo NGA",
+      "description": "Appareil photo Gaia NGA"
+    },
+    "zh-TW": {
+      "name": "相機 NGA",
+      "description": "Gaia 相機 NGA"
+    }
+  },
+  "default_locale": "en",
+  "fullscreen": true
+}

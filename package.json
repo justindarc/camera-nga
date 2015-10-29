@@ -1,0 +1,13 @@
+{
+  "name": "gaia-camera-nga",
+  "description": "Gaia Camera NGA",
+  "version": "2.6.0-alpha1",
+  "license": "Apache 2.0",
+  "scripts": {
+    "test": "./node_modules/.bin/mocha --harmony"
+  },
+  "devDependencies": {
+    "mocha": "^2.2.5",
+    "sinon": "^1.15.4"
+  }
+}

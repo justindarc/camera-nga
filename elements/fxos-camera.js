@@ -1,16 +1,9 @@
 (function(window) {
 'use strict';
 
-const CAMERA_IDS = navigator.mozCameras.getListOfCameras();
-
-const MODE_TYPES = ['picture', 'video'];
-
-const ORIENTATION_ANGLES = {
-  'portrait-primary':    0,
-  'landscape-primary':   90,
-  'portrait-secondary':  180,
-  'landscape-secondary': 270
-};
+const CAMERA_IDS  = navigator.mozCameras.getListOfCameras();
+const MODE_TYPES  = ['picture', 'video'];
+const SCALE_TYPES = ['aspect-fill', 'aspect-fit'];
 
 var proto = Object.create(HTMLElement.prototype);
 
@@ -19,28 +12,68 @@ proto.getCamera = function() {
     return this.camera;
   }
 
-  this.camera = navigator.mozCameras.getCamera(this.cameraId, this.configuration)
+  var config = {
+    mode: this.config.mode
+  };
+
+  this.camera = navigator.mozCameras.getCamera(this.cameraId, config)
     .then((camera) => {
-      copy(this.configuration, camera.configuration);
+      copy(this.config, camera.configuration);
+
+      this.config.sensorAngle = camera.camera.sensorAngle;
 
       return camera.camera;
+    })
+    .catch((error) => {
+      return navigator.mozCameras.getCamera(this.cameraId)
+        .then((camera) => {
+          copy(this.config, camera.configuration);
+
+          this.config.sensorAngle = camera.camera.sensorAngle;
+
+          return camera.camera;
+        });
     });
 
   return this.camera;
 };
 
-proto.configure = function(configuration) {
-  copy(this.configuration, configuration);
+proto.configure = function(config = {}) {
+  var lastWorkingConfig = copy({}, this.config);
 
-  return this.getCamera().then((camera) => {
-    copy(this.configuration, configuration);
+  copy(this.config, config);
 
-    return camera.setConfiguration(this.configuration).then((configuration) => {
-      copy(this.configuration, configuration);
+  return this.getCamera()
+    .then((camera) => {
+      copy(this.config, config);
 
-      return this.configuration;
-    });
-  });
+      return camera.setConfiguration(this.config)
+        .then(config => copy(this.config, config))
+        .catch(error => copy(this.config, lastWorkingConfig));
+    })
+    .then(() => this.updateVideoDimensions());
+};
+
+proto.updateVideoDimensions = function() {
+  var deltaAngle = this.config.sensorAngle - this.config.orientationAngle;
+
+  var viewfinderWidth  = this.config.viewfinderSize.width;
+  var viewfinderHeight = this.config.viewfinderSize.height;
+
+  var videoStyle = this.els.video.style;
+
+  if (deltaAngle % 180) {
+    videoStyle.top    = ((viewfinderHeight - viewfinderWidth) / 2) + 'px';
+    videoStyle.left   = ((viewfinderWidth - viewfinderHeight) / 2) + 'px';
+    videoStyle.width  = viewfinderHeight + 'px';
+    videoStyle.height = viewfinderWidth  + 'px';
+  }
+
+  else {
+
+  }
+
+  videoStyle.transform = 'rotate(' + deltaAngle + 'deg)';
 };
 
 proto.start = function() {
@@ -65,7 +98,9 @@ proto.stop = function() {
 };
 
 proto.restart = function() {
-  return this.stop().then(() => this.start());
+  return this.stop()
+    .then(() => this.configure())
+    .then(() => this.start());
 };
 
 proto.createdCallback = function() {
@@ -90,10 +125,36 @@ proto.createdCallback = function() {
   };
 
   this.camera = null;
-  this.configuration = {};
+
+  this.config = {
+    mode:  this.mode,
+    scale: this.scale
+  };
+
+  this.onResize = () => {
+    this.width  = this.els.container.offsetWidth;
+    this.height = this.els.container.offsetHeight;
+
+    var viewfinderSize = {
+      width:  Math.ceil(this.width  * devicePixelRatio),
+      height: Math.ceil(this.height * devicePixelRatio)
+    };
+
+    var orientationAngle = screen.orientation.angle;
+    var rotation         = -orientationAngle;
+
+    this.configure({
+      viewfinderSize:   viewfinderSize,
+      orientationAngle: orientationAngle,
+      rotation:         rotation
+    });
+  };
 };
 
 proto.attachedCallback = function() {
+  window.addEventListener('resize', this.onResize);
+  this.onResize();
+
   this.start().then(() => {
     console.log('Startup time: %s',
       Date.now() - performance.timing.domLoading + 'ms');
@@ -101,6 +162,8 @@ proto.attachedCallback = function() {
 };
 
 proto.detachedCallback = function() {
+  window.removeEventListener('resize', this.onResize);
+
   this.stop();
 };
 
@@ -116,53 +179,47 @@ proto.attributeChangedCallback = function(attr, oldVal, newVal) {
         mode: MODE_TYPES.indexOf(newVal) !== -1 ? newVal : MODE_TYPES[0]
       });
       break;
+    case 'scale':
+      this.els.container.dataset.scale = newVal;
+      this.configure({
+        scale: SCALE_TYPES.indexOf(newVal) !== -1 ? newVal : SCALE_TYPES[0]
+      });
+      break;
   }
 };
 
-Object.defineProperty(proto, 'cameraId', {
-  get: function() {
-    var value = this.getAttribute('camera-id');
+defineEnumProperty(proto, 'cameraId', CAMERA_IDS);
+defineEnumProperty(proto, 'mode',     MODE_TYPES);
+defineEnumProperty(proto, 'scale',    SCALE_TYPES);
 
-    return CAMERA_IDS.indexOf(value) !== -1 ? value : CAMERA_IDS[0];
-  },
+function defineEnumProperty(object, property, values) {
+  var attribute = propertyToAttribute(property);
 
-  set: function(value) {
-    value = CAMERA_IDS.indexOf(value) !== -1 ? value : CAMERA_IDS[0];
+  Object.defineProperty(object, property, {
+    get: function() {
+      var value = this.getAttribute(attribute);
 
-    this.setAttribute('camera-id', value);
-  }
-});
+      return values.indexOf(value) !== -1 ? value : values[0];
+    },
 
-Object.defineProperty(proto, 'mode', {
-  get: function() {
-    var value = this.getAttribute('mode');
+    set: function(value) {
+      value = values.indexOf(value) !== -1 ? value : values[0];
 
-    return MODE_TYPES.indexOf(value) !== -1 ? value : MODE_TYPES[0];
-  },
+      this.setAttribute(attribute, value);
+    }
+  });
+}
 
-  set: function(value) {
-    value = MODE_TYPES.indexOf(value) !== -1 ? value : MODE_TYPES[0];
-
-    this.setAttribute('mode', value);
-  }
-});
-
-// ['camera-id'].forEach((prop) => {
-//   Object.defineProperty(proto, prop, {
-//     get: function() {
-//       return this.getAttribute(prop);
-//     },
-
-//     set: function(value) {
-//       this.setAttribute(prop, value || '');
-//     }
-//   });
-// });
+function propertyToAttribute(property) {
+  return property.replace(/([a-z])([A-Z])/g, '$1-$2').toLowerCase();
+}
 
 function copy(target, source) {
   for (var p in source) {
     target[p] = source[p];
   }
+
+  return target;
 }
 
 try {
